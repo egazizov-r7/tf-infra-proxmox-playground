@@ -69,9 +69,55 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
+      - name: Check Terraform State
+        id: check_state
+        run: |
+          echo "=== Checking Terraform State ==="
+          if [ -f terraform.tfstate ]; then
+            echo "State file exists locally"
+            echo "state_exists=true" >> $GITHUB_OUTPUT
+            
+            # Show state summary
+            echo "=== State Summary ==="
+            terraform show -json terraform.tfstate | jq -r '.values.root_module.resources[]?.address // empty' || echo "No resources in state"
+          else
+            echo "No local state file found"
+            echo "state_exists=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Check if state has any resources
+          RESOURCE_COUNT=$(terraform state list 2>/dev/null | wc -l)
+          echo "Resources in state: $RESOURCE_COUNT"
+          echo "resource_count=$RESOURCE_COUNT" >> $GITHUB_OUTPUT
+          
+          if [ "$RESOURCE_COUNT" -gt 0 ]; then
+            echo "=== Resources in State ==="
+            terraform state list
+          fi
+
       - name: Terraform Plan
         if: github.event.inputs.action == 'plan' || github.event.inputs.action == 'apply'
         run: terraform plan
+
+      - name: Terraform Plan Destroy
+        if: github.event.inputs.action == 'destroy'
+        run: |
+          echo "=== Planning Destroy Operation ==="
+          if [ "${{ steps.check_state.outputs.resource_count }}" -eq "0" ]; then
+            echo "⚠️  No resources in state - nothing to destroy"
+            echo "This is normal if:"
+            echo "  1. Resources were never created with this workflow"
+            echo "  2. Resources were destroyed manually"
+            echo "  3. State file was lost or reset"
+            echo ""
+            echo "If you expected resources to exist, check:"
+            echo "  - Previous workflow runs created resources"
+            echo "  - Same service type was used for creation and destruction"
+            echo "  - State wasn't manually modified"
+          else
+            echo "Planning destroy for ${{ steps.check_state.outputs.resource_count }} resources..."
+            terraform plan -destroy
+          fi
 
       - name: Terraform Apply
         if: github.event.inputs.action == 'apply'
@@ -79,7 +125,33 @@ jobs:
 
       - name: Terraform Destroy
         if: github.event.inputs.action == 'destroy'
-        run: terraform destroy -auto-approve
+        run: |
+          echo "=== Executing Destroy Operation ==="
+          if [ "${{ steps.check_state.outputs.resource_count }}" -eq "0" ]; then
+            echo "✅ No resources to destroy - infrastructure is already clean"
+            echo ""
+            echo "SUMMARY: No changes because no resources exist in state"
+            echo "This is the expected behavior when:"
+            echo "  - Infrastructure was never deployed with this workflow"
+            echo "  - Infrastructure was previously destroyed"
+            echo "  - Manual cleanup was performed"
+          else
+            echo "🗑️  Destroying ${{ steps.check_state.outputs.resource_count }} resources..."
+            echo "Resources to be destroyed:"
+            terraform state list
+            echo ""
+            echo "Executing destroy..."
+            terraform destroy -auto-approve
+            
+            # Verify destruction
+            REMAINING_RESOURCES=$(terraform state list 2>/dev/null | wc -l)
+            if [ "$REMAINING_RESOURCES" -eq "0" ]; then
+              echo "✅ All resources successfully destroyed"
+            else
+              echo "⚠️  Some resources may still exist:"
+              terraform state list
+            fi
+          fi
 
       - name: Show Outputs
         if: github.event.inputs.action == 'apply'
