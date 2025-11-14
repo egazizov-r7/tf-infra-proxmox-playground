@@ -1,10 +1,19 @@
-name: Deploy All Infrastructure
+name: Deploy Infrastructure
 
 on:
   workflow_dispatch:
     inputs:
+      service_type:
+        description: 'Service Type'
+        required: true
+        type: choice
+        options:
+          - lxc/nginx_proxy_manager
+          - lxc/cloudflare_tunnel
+          - vm/debian
+          - vm/windows_tiny10
       action:
-        description: 'Terraform action'
+        description: 'Terraform Action'
         required: true
         default: 'apply'
         type: choice
@@ -14,12 +23,12 @@ on:
           - destroy
 
 jobs:
-  terraform:
-    name: Deploy All Infrastructure (LXC + VMs)
+  deploy:
+    name: Deploy ${{ github.event.inputs.service_type }}
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./instances/prod
+        working-directory: ./instances/prod/${{ github.event.inputs.service_type }}
 
     steps:
       - name: Checkout code
@@ -32,18 +41,27 @@ jobs:
 
       - name: Create terraform.tfvars
         run: |
-          cat > terraform.tfvars <<'EOF'
+          cat > terraform.tfvars <<EOF
+          # Proxmox Provider Configuration
           proxmox_api_url          = "${{ secrets.PROXMOX_API_URL }}"
           proxmox_api_token_id     = "${{ secrets.PROXMOX_API_TOKEN_ID }}"
           proxmox_api_token_secret = "${{ secrets.PROXMOX_API_TOKEN_SECRET }}"
           proxmox_tls_insecure     = true
 
-          # LXC Containers configuration
-          lxc_containers = ${{ vars.LXC_CONTAINERS }}
-
-          # VMs configuration  
-          vms = ${{ vars.VMS }}
+          # Service Configuration (copied from terraform.tfvars.example)
           EOF
+          
+          # Append service-specific configuration from terraform.tfvars.example
+          grep -v "^#" terraform.tfvars.example | grep -v "^proxmox_" | grep -v "^$" >> terraform.tfvars
+
+      - name: Show Configuration
+        run: |
+          echo "=== Service: ${{ github.event.inputs.service_type }} ==="
+          echo "=== Action: ${{ github.event.inputs.action }} ==="
+          echo "=== Working Directory: $(pwd) ==="
+          echo ""
+          echo "=== Generated terraform.tfvars ==="
+          cat terraform.tfvars
 
       - name: Terraform Init
         run: terraform init
@@ -62,3 +80,7 @@ jobs:
       - name: Terraform Destroy
         if: github.event.inputs.action == 'destroy'
         run: terraform destroy -auto-approve
+
+      - name: Show Outputs
+        if: github.event.inputs.action == 'apply'
+        run: terraform output
