@@ -1,0 +1,21 @@
+# Proxmox Provider Configuration
+proxmox_api_url          = "https://your-proxmox-host:8006/api2/json"
+proxmox_api_token_id     = "terraform@pam!terraform"
+proxmox_api_token_secret = "your-api-token-secret"
+proxmox_tls_insecure     = true
+
+# Windows Tiny10 VM Configuration
+node = "pve"
+name = "windows-tiny10"
+template = "local:iso/tiny10-x64-21h2.iso"
+cores = 2
+memory = 4096
+storage = "local-lvm"
+disk_size = "40G"
+bridge = "vmbr0"
+ipconfig = "ip=dhcp"
+user = "administrator"
+password = "windows-vm-password"
+ssh_keys = ""
+setup_script = ""
+enable_provisioning = false
