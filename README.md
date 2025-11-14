@@ -1,51 +1,71 @@
 # Proxmox Infrastructure as Code
 
-A scalable Terraform solution for deploying and managing multiple LXC containers and VMs on Proxmox, with automated deployment via GitHub Actions.
+A streamlined Terraform solution for deploying and managing infrastructure on Proxmox with individual service isolation and automated deployment via GitHub Actions.
 
-> **✅ Production-Ready Configuration**: This project contains only production-ready configurations. Run `./verify-structure.sh` to confirm.
+> **🎯 Clean & Modular**: Each service (LXC container or VM) is completely isolated with its own Terraform configuration for maximum flexibility and maintainability.
 
-## Project Structure
+## 🏗️ Project Structure
 
 ```
-tf-infra-proxmox/
-├── modules/                      # Reusable Terraform modules
-│   ├── lxc/                     # LXC container module
-│   │   ├── main.tf
-│   │   └── variables.tf
-│   └── vm/                      # VM module
-│       ├── main.tf
-│       └── variables.tf
-├── instances/                    # Production configuration
-│   └── prod/                    # Production environment
-│       ├── main.tf              # Uses modules to create multiple resources
-│       ├── variables.tf
-│       ├── outputs.tf
-│       ├── terraform.tfvars.example
-│       └── scripts/             # Production setup scripts
-│           ├── web-setup.sh
-│           ├── db-setup.sh
-│           └── app-setup.sh
-├── .github/
-│   ├── workflows/
-│   │   ├── deploy-infrastructure.yml  # Deploy all (LXC + VMs)
-│   │   ├── deploy-lxc.yml            # Deploy LXC only
-│   │   └── deploy-vm.yml             # Deploy VMs only
-│   └── examples/                # Example configurations for GitHub variables
-│       ├── lxc_containers.json
-│       └── vms.json
+tf-infra-proxmox-playground/
+├── modules/                     # Reusable Terraform modules
+│   ├── lxc/                    # LXC container module
+│   └── vm/                     # Virtual machine module
+├── instances/prod/             # Production services
+│   ├── lxc/                   # LXC-based services
+│   │   ├── nginx_proxy_manager/
+│   │   │   ├── main.tf
+│   │   │   ├── variables.tf
+│   │   │   ├── outputs.tf
+│   │   │   ├── terraform.tfvars.example
+│   │   │   └── scripts/
+│   │   │       └── nginx-proxy-setup.sh
+│   │   └── cloudflare_tunnel/
+│   │       ├── main.tf
+│   │       ├── variables.tf
+│   │       ├── outputs.tf
+│   │       ├── terraform.tfvars.example
+│   │       └── scripts/
+│   │           └── cloudflare-tunnel-setup.sh
+│   ├── vm/                    # Virtual machine services
+│   │   ├── debian/
+│   │   │   ├── main.tf
+│   │   │   ├── variables.tf
+│   │   │   ├── outputs.tf
+│   │   │   └── terraform.tfvars.example
+│   │   └── windows_tiny10/
+│   │       ├── main.tf
+│   │       ├── variables.tf
+│   │       ├── outputs.tf
+│   │       └── terraform.tfvars.example
+│   └── validate-all.sh        # Validation tool
+├── .github/workflows/
+│   └── deploy-infrastructure.yml  # Unified deployment workflow
 └── README.md
 ```
 
-## Key Features
+## ✨ Key Features
 
-✅ **Multi-Instance Support**: Deploy multiple LXC containers and VMs in a single configuration  
-✅ **Modular Design**: Reusable modules for consistent deployments  
-✅ **Separate Workflows**: Deploy all, LXC only, or VMs only via GitHub Actions  
-✅ **Flexible Provisioning**: Optional automated setup scripts per instance  
-✅ **Action Control**: Plan, apply, or destroy via workflow inputs  
-✅ **DHCP & Static IP**: Support for both network configurations
+✅ **Complete Isolation**: Each service is an independent Terraform module  
+✅ **Service-Specific**: Tailored configurations for each service type  
+✅ **Unified Deployment**: Single GitHub Actions workflow for all services  
+✅ **Local Validation**: Test configurations before deployment  
+✅ **Clean Structure**: No redundant files or complex dependencies  
+✅ **Easy Scaling**: Add new services by copying and customizing existing ones
 
-## Prerequisites
+## 📋 Available Services
+
+### LXC Containers
+
+- **Nginx Proxy Manager** (`lxc/nginx_proxy_manager`) - Web-based reverse proxy management
+- **Cloudflare Tunnel** (`lxc/cloudflare_tunnel`) - Secure tunnel to Cloudflare network
+
+### Virtual Machines
+
+- **Debian VM** (`vm/debian`) - Standard Debian virtual machine
+- **Windows Tiny10** (`vm/windows_tiny10`) - Lightweight Windows 10 VM
+
+## 🚀 Quick Start
 
 - Proxmox VE server (7.x or later)
 - **For LXC**: Debian container templates
@@ -76,125 +96,311 @@ pveam download local debian-12-standard_12.2-1_amd64.tar.zst
 
 #### For VM: Create Cloud-Init Template
 
-```bash
+````bash
 wget https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2
 # Create template in Proxmox (see Proxmox docs for detailed steps)
+## 📋 Prerequisites
+
+### Proxmox Environment
+- **Proxmox VE** 7.x or later
+- **API Access** with token-based authentication
+- **LXC Templates** for container services (Debian 12 recommended)
+- **VM Templates/ISOs** for virtual machine deployments
+
+### GitHub Repository
+- **GitHub Actions** enabled
+- **Secrets configured** for Proxmox API access
+
+## ⚙️ Setup Instructions
+
+### 1. Prepare Proxmox
+
+#### Create API Token
+```bash
+# In Proxmox web interface:
+# Datacenter → Permissions → API Tokens → Add
+# User: terraform@pam
+# Token ID: terraform
+# Privilege Separation: Unchecked
+````
+
+#### Upload LXC Templates (for LXC services)
+
+```bash
+pveam update
+pveam download local debian-12-standard_12.2-1_amd64.tar.zst
 ```
 
-### 2. Configure GitHub
+### 2. Configure GitHub Secrets
 
-#### Add Secrets
+Navigate to: **Repository Settings** → **Secrets and variables** → **Actions** → **Secrets**
 
-Navigate to: **Settings** → **Secrets and variables** → **Actions** → **Secrets**
+Add these secrets:
 
 - `PROXMOX_API_URL`: `https://your-proxmox-host:8006/api2/json`
 - `PROXMOX_API_TOKEN_ID`: `terraform@pam!terraform`
-- `PROXMOX_API_TOKEN_SECRET`: Your token secret
+- `PROXMOX_API_TOKEN_SECRET`: Your generated token secret
 
-#### Add Variables
+### 3. Validate Configuration (Optional)
 
-Navigate to: **Settings** → **Secrets and variables** → **Actions** → **Variables**
-
-**Method 1: Simple Configuration (Recommended for testing)**
-
-- `LXC_CONTAINERS`: Copy content from `.github/examples/lxc_containers.json`
-- `VMS`: Copy content from `.github/examples/vms.json`
-- Replace `REPLACE_WITH_SECRET` placeholders with actual passwords
-
-**Method 2: Use Secrets for Passwords (Production)**
-Create additional secrets for each instance password, then reference them in the JSON configuration.
-
-### 3. Deploy Infrastructure
-
-#### Via GitHub Actions
-
-You have three workflow options:
-
-**Option 1: Deploy All Infrastructure (LXC + VMs)**
-
-1. Go to **Actions** tab
-2. Select **Deploy All Infrastructure**
-3. Click **Run workflow**
-4. Choose action: `plan`, `apply`, or `destroy`
-
-**Option 2: Deploy LXC Containers Only**
-
-1. Go to **Actions** tab
-2. Select **Deploy LXC Containers**
-3. Click **Run workflow**
-4. Choose action: `plan`, `apply`, or `destroy`
-
-**Option 3: Deploy VMs Only**
-
-1. Go to **Actions** tab
-2. Select **Deploy VMs**
-3. Click **Run workflow**
-4. Choose action: `plan`, `apply`, or `destroy`
-
-#### Local Deployment
+Test all service configurations locally:
 
 ```bash
 cd instances/prod
+./validate-all.sh
+```
+
+## 🚀 Deployment Methods
+
+### Method 1: GitHub Actions (Recommended)
+
+1. **Navigate to Actions tab** in your GitHub repository
+2. **Select "Deploy Infrastructure"** workflow
+3. **Choose service** from dropdown:
+   - `lxc/nginx_proxy_manager`
+   - `lxc/cloudflare_tunnel`
+   - `vm/debian`
+   - `vm/windows_tiny10`
+4. **Select action**: `plan`, `apply`, or `destroy`
+5. **Click "Run workflow"**
+
+### Method 2: Local Deployment
+
+```bash
+# Navigate to specific service
+cd instances/prod/lxc/nginx_proxy_manager
+
+# Copy and edit configuration
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your configuration
+# Edit terraform.tfvars with your settings
+
+# Deploy
 terraform init
 terraform plan
 terraform apply
 ```
 
-## Configuration Guide
+## 📝 Service Configuration
 
-### Defining Multiple Instances
+Each service has its own `terraform.tfvars.example` with all necessary configuration options:
 
-Edit `instances/prod/terraform.tfvars.example` to define your infrastructure:
+### Example: Nginx Proxy Manager
 
 ```hcl
-lxc_containers = {
-  "web-server" = {
-    node         = "pve"
-    hostname     = "web-01"
-    template     = "local:vztmpl/debian-12-standard_12.2-1_amd64.tar.zst"
-    password     = "secure-password"
-    ip           = "192.168.1.101/24"
-    gateway      = "192.168.1.1"
-    memory       = 1024
-    cores        = 2
-    disk_size    = "10G"
-    setup_script = "${path.module}/scripts/web-setup.sh"
-    enable_provisioning = true
-  },
+# Proxmox Connection
+proxmox_api_url          = "https://your-proxmox:8006/api2/json"
+proxmox_api_token_id     = "terraform@pam!terraform"
+proxmox_api_token_secret = "your-token-secret"
 
-  "database" = {
-    node     = "pve"
-    hostname = "db-01"
-    template = "local:vztmpl/debian-12-standard_12.2-1_amd64.tar.zst"
-    password = "secure-password"
-    ip       = "192.168.1.102/24"
-    gateway  = "192.168.1.1"
-    memory   = 2048
-    cores    = 2
-    disk_size = "20G"
-    setup_script = "${path.module}/scripts/db-setup.sh"
-    enable_provisioning = true
-  }
-}
-
-vms = {
-  "app-server" = {
-    node     = "pve"
-    name     = "app-01"
-    template = "debian-12-cloudinit"
-    password = "secure-password"
-    user     = "debian"
-    ipconfig = "ip=192.168.1.201/24,gw=192.168.1.1"
-    cores    = 4
-    memory   = 4096
-    disk_size = "40G"
-    setup_script = "${path.module}/scripts/app-setup.sh"
-    enable_provisioning = true
-  }
-}
+# Container Settings
+node = "pve"
+hostname = "nginx-proxy-manager"
+template = "local:vztmpl/debian-12-standard_12.2-1_amd64.tar.zst"
+ip = "192.168.1.100/24"
+memory = 1024
+cores = 2
+# ... additional settings
 ```
+
+## 📦 Adding New Services
+
+### 1. Create Service Directory
+
+```bash
+mkdir -p instances/prod/lxc/my_new_service
+# or
+mkdir -p instances/prod/vm/my_new_vm
+```
+
+### 2. Copy Template Files
+
+```bash
+# For LXC service
+cp instances/prod/lxc/nginx_proxy_manager/* instances/prod/lxc/my_new_service/
+
+# For VM service
+cp instances/prod/vm/debian/* instances/prod/vm/my_new_vm/
+```
+
+### 3. Customize Configuration
+
+- Edit `main.tf` - Update module name and description
+- Edit `terraform.tfvars.example` - Set service-specific values
+- Edit `outputs.tf` - Update output descriptions
+- Create `scripts/` directory with setup scripts if needed
+
+### 4. Deploy
+
+Use the GitHub Actions workflow with your new service path.
+
+## 🔧 Advanced Configuration
+
+### Custom Setup Scripts
+
+Each service can include automated setup scripts:
+
+```bash
+# Create scripts directory
+mkdir instances/prod/lxc/my_service/scripts
+
+# Create setup script
+cat > instances/prod/lxc/my_service/scripts/setup.sh << 'EOF'
+#!/bin/bash
+echo "Setting up my service..."
+# Your setup commands here
+EOF
+
+# Reference in terraform.tfvars.example
+setup_script = "./scripts/setup.sh"
+enable_provisioning = true
+```
+
+### Network Configuration
+
+#### Static IP Configuration
+
+```hcl
+# For LXC containers
+ip = "192.168.1.100/24"
+gateway = "192.168.1.1"
+
+# For VMs
+ipconfig = "ip=192.168.1.200/24,gw=192.168.1.1"
+```
+
+#### DHCP Configuration
+
+```hcl
+# For LXC containers
+ip = "dhcp"
+
+# For VMs
+ipconfig = "ip=dhcp"
+```
+
+## 🔍 Validation & Testing
+
+### Validate All Services
+
+```bash
+cd instances/prod
+./validate-all.sh
+```
+
+### Validate Individual Service
+
+```bash
+cd instances/prod/lxc/nginx_proxy_manager
+terraform init -backend=false
+terraform validate
+```
+
+### Test Service Configuration
+
+```bash
+# Copy example configuration
+cp terraform.tfvars.example terraform.tfvars
+# Edit with test values
+terraform plan  # Review planned changes
+```
+
+## 📚 Service Documentation
+
+### Nginx Proxy Manager
+
+- **Purpose**: Web-based reverse proxy management with Let's Encrypt integration
+- **Access**: `http://container-ip:81` (default: admin@example.com/changeme)
+- **Features**: SSL certificates, proxy hosts, access lists
+
+### Cloudflare Tunnel
+
+- **Purpose**: Secure tunnel to expose internal services via Cloudflare
+- **Setup**: Requires Cloudflare account and tunnel configuration
+- **Features**: Zero-trust access, automatic SSL, DDoS protection
+
+### Debian VM
+
+- **Purpose**: General-purpose Debian virtual machine
+- **Features**: Full VM with cloud-init support, SSH access
+- **Use Cases**: Development, hosting applications, general computing
+
+### Windows Tiny10
+
+- **Purpose**: Lightweight Windows 10 virtual machine
+- **Features**: Minimal Windows installation, RDP access
+- **Use Cases**: Windows-specific applications, testing
+
+## 🛠️ Troubleshooting
+
+### Common Issues
+
+#### Authentication Failed
+
+```bash
+# Check API token permissions in Proxmox
+# Ensure token has necessary privileges
+```
+
+#### Template Not Found
+
+```bash
+# List available templates
+pveam list local
+
+# Download required template
+pveam download local debian-12-standard_12.2-1_amd64.tar.zst
+```
+
+#### Network Configuration Issues
+
+```bash
+# Check Proxmox network bridges
+ip link show
+
+# Verify bridge configuration matches terraform.tfvars
+```
+
+### Debug Mode
+
+```bash
+# Enable Terraform debug logging
+export TF_LOG=DEBUG
+terraform apply
+```
+
+## 🤝 Contributing
+
+1. **Fork** the repository
+2. **Create feature branch**: `git checkout -b feature/new-service`
+3. **Add your service** following the established patterns
+4. **Test configuration**: Run `./validate-all.sh`
+5. **Submit pull request** with clear description
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🔗 Related Resources
+
+- [Proxmox VE Documentation](https://pve.proxmox.com/wiki/Main_Page)
+- [Terraform Proxmox Provider](https://registry.terraform.io/providers/Telmate/proxmox/latest/docs)
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)
+  "app-server" = {
+  node = "pve"
+  name = "app-01"
+  template = "debian-12-cloudinit"
+  password = "secure-password"
+  user = "debian"
+  ipconfig = "ip=192.168.1.201/24,gw=192.168.1.1"
+  cores = 4
+  memory = 4096
+  disk_size = "40G"
+  setup_script = "${path.module}/scripts/app-setup.sh"
+  enable_provisioning = true
+  }
+  }
+
+````
 
 ### Adding/Removing Instances
 
@@ -214,7 +420,7 @@ lxc_containers = {
     cores    = 1
   }
 }
-```
+````
 
 **Remove an instance:**  
 Simply delete the block from the configuration and run `terraform apply`
