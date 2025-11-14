@@ -31,22 +31,19 @@ resource "proxmox_lxc" "container" {
   memory = var.memory
   cores  = var.cores
 
-  # Only add provisioning if enabled and not using DHCP
-  dynamic "connection" {
-    for_each = var.enable_provisioning && var.ip != "dhcp" ? [1] : []
-    content {
+  # Wait for container
+  provisioner "remote-exec" {
+    when       = create
+    on_failure = continue
+
+    connection {
       type     = "ssh"
       user     = "root"
       password = var.password
       host     = regex("([0-9.]+)", var.ip)[0]
       timeout  = "2m"
     }
-  }
 
-  # Wait for container
-  provisioner "remote-exec" {
-    when       = create
-    on_failure = continue
     inline = var.enable_provisioning && var.ip != "dhcp" ? [
       "while [ ! -f /var/lib/dpkg/lock-frontend ]; do sleep 1; done",
       "sleep 5"
@@ -57,6 +54,15 @@ resource "proxmox_lxc" "container" {
   provisioner "remote-exec" {
     when       = create
     on_failure = continue
+
+    connection {
+      type     = "ssh"
+      user     = "root"
+      password = var.password
+      host     = regex("([0-9.]+)", var.ip)[0]
+      timeout  = "2m"
+    }
+
     inline = var.enable_provisioning && var.ip != "dhcp" ? [
       "apt-get update",
       "apt-get upgrade -y",
@@ -66,8 +72,17 @@ resource "proxmox_lxc" "container" {
 
   # Upload and run custom script if provided
   provisioner "file" {
-    when        = create
-    on_failure  = continue
+    when       = create
+    on_failure = continue
+
+    connection {
+      type     = "ssh"
+      user     = "root"
+      password = var.password
+      host     = regex("([0-9.]+)", var.ip)[0]
+      timeout  = "2m"
+    }
+
     source      = var.setup_script != "" && var.enable_provisioning && var.ip != "dhcp" ? var.setup_script : "/dev/null"
     destination = "/tmp/setup.sh"
   }
@@ -75,6 +90,15 @@ resource "proxmox_lxc" "container" {
   provisioner "remote-exec" {
     when       = create
     on_failure = continue
+
+    connection {
+      type     = "ssh"
+      user     = "root"
+      password = var.password
+      host     = regex("([0-9.]+)", var.ip)[0]
+      timeout  = "2m"
+    }
+
     inline = var.setup_script != "" && var.enable_provisioning && var.ip != "dhcp" ? [
       "chmod +x /tmp/setup.sh",
       "/tmp/setup.sh",

@@ -36,21 +36,18 @@ resource "proxmox_vm_qemu" "vm" {
   cipassword = var.password
   sshkeys    = var.ssh_keys
 
-  # Only add provisioning if enabled and static IP
-  dynamic "connection" {
-    for_each = var.enable_provisioning && can(regex("ip=([0-9.]+)", var.ipconfig)) ? [1] : []
-    content {
+  provisioner "remote-exec" {
+    when       = create
+    on_failure = continue
+
+    connection {
       type     = "ssh"
       user     = var.user
       password = var.password
       host     = regex("ip=([0-9.]+)", var.ipconfig)[0]
       timeout  = "5m"
     }
-  }
 
-  provisioner "remote-exec" {
-    when       = create
-    on_failure = continue
     inline = var.enable_provisioning && can(regex("ip=([0-9.]+)", var.ipconfig)) ? [
       "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do sleep 1; done",
       "sleep 5"
@@ -60,6 +57,15 @@ resource "proxmox_vm_qemu" "vm" {
   provisioner "remote-exec" {
     when       = create
     on_failure = continue
+
+    connection {
+      type     = "ssh"
+      user     = var.user
+      password = var.password
+      host     = regex("ip=([0-9.]+)", var.ipconfig)[0]
+      timeout  = "5m"
+    }
+
     inline = var.enable_provisioning && can(regex("ip=([0-9.]+)", var.ipconfig)) ? [
       "sudo apt-get update",
       "sudo apt-get upgrade -y",
@@ -68,8 +74,17 @@ resource "proxmox_vm_qemu" "vm" {
   }
 
   provisioner "file" {
-    when        = create
-    on_failure  = continue
+    when       = create
+    on_failure = continue
+
+    connection {
+      type     = "ssh"
+      user     = var.user
+      password = var.password
+      host     = regex("ip=([0-9.]+)", var.ipconfig)[0]
+      timeout  = "5m"
+    }
+
     source      = var.setup_script != "" && var.enable_provisioning && can(regex("ip=([0-9.]+)", var.ipconfig)) ? var.setup_script : "/dev/null"
     destination = "/tmp/setup.sh"
   }
@@ -77,6 +92,15 @@ resource "proxmox_vm_qemu" "vm" {
   provisioner "remote-exec" {
     when       = create
     on_failure = continue
+
+    connection {
+      type     = "ssh"
+      user     = var.user
+      password = var.password
+      host     = regex("ip=([0-9.]+)", var.ipconfig)[0]
+      timeout  = "5m"
+    }
+
     inline = var.setup_script != "" && var.enable_provisioning && can(regex("ip=([0-9.]+)", var.ipconfig)) ? [
       "chmod +x /tmp/setup.sh",
       "sudo /tmp/setup.sh",
